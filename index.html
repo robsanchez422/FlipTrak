@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>FlipTrack</title>
+
+<!-- PWA Meta -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FlipTrack">
+<meta name="theme-color" content="#0e0e0f">
+<meta name="description" content="Facebook Marketplace Inventory Tracker">
+
+<!-- PWA Icons (inline SVG as data URIs for self-contained file) -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%230e0e0f'/%3E%3Ctext x='256' y='340' font-size='280' text-anchor='middle' font-family='Arial Black,sans-serif' fill='%23f5c842'%3EF%3C/text%3E%3C/svg%3E">
+
+<!-- Inline Web App Manifest -->
+<script>
+const manifestData = {
+  name: "FlipTrack",
+  short_name: "FlipTrack",
+  description: "Facebook Marketplace Inventory Tracker",
+  start_url: "https://robsanchez422.github.io/FlipTrak/",
+  display: "standalone",
+  background_color: "#0e0e0f",
+  theme_color: "#0e0e0f",
+  orientation: "portrait-primary",
+  icons: [
+    { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%230e0e0f'/%3E%3Ctext x='256' y='340' font-size='280' text-anchor='middle' font-family='Arial Black,sans-serif' fill='%23f5c842'%3EF%3C/text%3E%3C/svg%3E", sizes: "512x512", type: "image/svg+xml" }
+  ]
+};
+const blob = new Blob([JSON.stringify(manifestData)], {type: 'application/json'});
+const manifestUrl = URL.createObjectURL(blob);
+const link = document.createElement('link');
+link.rel = 'manifest'; link.href = manifestUrl;
+document.head.appendChild(link);
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0e0e0f;
+    --surface: #161618;
+    --surface2: #1e1e21;
+    --surface3: #27272b;
+    --border: #2e2e33;
+    --accent: #f5c842;
+    --accent2: #ff6b35;
+    --accent3: #4ade80;
+    --text: #f0f0f2;
+    --text2: #9898a8;
+    --text3: #5a5a6a;
+    --sold: #4ade80;
+    --listed: #f5c842;
+    --bought: #ff6b35;
+    --danger: #ff4757;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    overflow-x: hidden;
+    padding-bottom: calc(var(--safe-bottom) + 16px);
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(14,14,15,0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    padding-top: var(--safe-top);
+    display: flex; align-items: center; justify-content: space-between;
+    height: calc(56px + var(--safe-top));
+  }
+  .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; letter-spacing: -0.5px; }
+  .logo span { color: var(--accent); }
+
+  /* ── INSTALL BANNER ── */
+  #install-banner {
+    display: none;
+    background: linear-gradient(135deg, #1a1a00, #1e1a00);
+    border-bottom: 1px solid rgba(245,200,66,.3);
+    padding: 12px 16px;
+    align-items: center; gap: 12px;
+    font-size: 13px; color: var(--text2);
+  }
+  #install-banner.show { display: flex; }
+  #install-banner strong { color: var(--accent); }
+  #install-banner .dismiss { margin-left: auto; background: none; border: none; color: var(--text3); font-size: 18px; cursor: pointer; }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 1px; background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .stat-cell {
+    background: var(--surface);
+    padding: 14px 12px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .stat-label { font-size: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 1px; color: var(--text3); }
+  .stat-value { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; }
+  .stat-value.green { color: var(--sold); }
+  .stat-value.yellow { color: var(--listed); }
+  .stat-value.orange { color: var(--bought); }
+  .stat-value.blue { color: #60a5fa; }
+
+  /* ── TOOLBAR ── */
+  .toolbar {
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .search-wrap { position: relative; flex: 1; min-width: 160px; }
+  .search-wrap input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 16px;
+    padding: 10px 14px 10px 36px; border-radius: 8px; outline: none;
+    transition: border-color .2s; -webkit-appearance: none;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap .icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text3); font-size: 14px; }
+
+  select, .btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+    padding: 9px 12px; border-radius: 8px; cursor: pointer; outline: none;
+    transition: all .2s; -webkit-appearance: none; appearance: none;
+  }
+  select { padding-right: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a5a6a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+  select:focus, .btn:hover { border-color: var(--accent); }
+  .btn-primary { background: var(--accent); color: #000; font-weight: 600; border-color: var(--accent); }
+  .btn-primary:active { background: #ffd560; }
+
+  .tag-filter-wrap { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; width: 100%; }
+  .tag-chip { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); transition: all .15s; user-select: none; }
+  .tag-chip.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+  /* ── ITEM GRID ── */
+  .items-container { padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+
+  .item-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    transition: transform .2s, border-color .2s, box-shadow .2s;
+    cursor: pointer; position: relative;
+    -webkit-user-select: none; user-select: none;
+  }
+  .item-card:active { transform: scale(0.98); }
+
+  .item-card-header { padding: 14px 14px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .item-name { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; line-height: 1.3; flex: 1; }
+  .status-badge { font-size: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 1px; padding: 3px 8px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
+  .status-listed { background: rgba(245,200,66,.15); color: var(--listed); }
+  .status-sold { background: rgba(74,222,128,.15); color: var(--sold); }
+  .status-unlisted { background: rgba(152,152,168,.1); color: var(--text2); }
+
+  .item-card-body { padding: 12px 14px; }
+  .price-row { display: flex; gap: 12px; margin-bottom: 10px; }
+  .price-item { flex: 1; }
+  .price-label { font-size: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 1px; color: var(--text3); margin-bottom: 2px; }
+  .price-val { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; }
+  .price-val.buy { color: var(--bought); }
+  .price-val.list { color: var(--listed); }
+  .price-val.sell { color: var(--sold); }
+
+  .desc-text { font-size: 13px; color: var(--text2); line-height: 1.5; margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .tags-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .item-tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: var(--surface3); color: var(--text2); font-family: 'DM Mono', monospace; }
+
+  .item-card-footer { padding: 10px 14px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .date-text { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+  .card-actions { display: flex; gap: 6px; }
+  .icon-btn { background: none; border: 1px solid var(--border); color: var(--text2); padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all .15s; min-width: 36px; min-height: 36px; display: flex; align-items: center; justify-content: center; }
+  .icon-btn:active { border-color: var(--accent); color: var(--accent); }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,.75); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    align-items: flex-end; justify-content: center; padding: 0;
+  }
+  @media (min-width: 600px) { .modal-overlay { align-items: center; padding: 16px; } }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px 20px 0 0; width: 100%;
+    max-height: 92vh; overflow-y: auto;
+    padding-bottom: var(--safe-bottom);
+  }
+  @media (min-width: 600px) { .modal { border-radius: 16px; max-width: 680px; } }
+
+  .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 0; }
+  .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--surface); z-index: 1; }
+  .modal-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; }
+  .close-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); width: 32px; height: 32px; border-radius: 50%; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .modal-body { padding: 20px; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 11px; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); }
+  input[type=text], input[type=number], input[type=date], textarea {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 16px;
+    padding: 11px 14px; border-radius: 8px; outline: none; transition: border-color .2s;
+    width: 100%; -webkit-appearance: none; appearance: none;
+  }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 80px; }
+  select.form-select {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 16px;
+    padding: 11px 32px 11px 14px; border-radius: 8px; outline: none;
+    width: 100%; -webkit-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a5a6a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+  }
+
+  .form-section-title { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text3); margin: 20px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+
+  .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; position: sticky; bottom: 0; background: var(--surface); z-index: 1; }
+  .btn-danger { background: rgba(255,71,87,.1); color: var(--danger); border-color: rgba(255,71,87,.3); }
+  .btn-danger:active { background: var(--danger); color: #fff; }
+
+  /* Tags input */
+  .tags-input-wrap { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 46px; padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; cursor: text; }
+  .tags-input-wrap:focus-within { border-color: var(--accent); }
+  .tag-pill { display: flex; align-items: center; gap: 4px; background: var(--surface3); color: var(--text); border-radius: 4px; padding: 4px 10px; font-size: 12px; font-family: 'DM Mono', monospace; }
+  .tag-pill button { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 0 0 2px; min-width: 20px; min-height: 20px; }
+  .tag-pill-input { background: none; border: none; outline: none; color: var(--text); font-size: 16px; font-family: 'DM Sans', sans-serif; min-width: 80px; flex: 1; }
+
+  /* Price history */
+  .price-history { }
+  .ph-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; flex-wrap: wrap; }
+  .ph-row:last-child { border-bottom: none; }
+  .ph-price { font-family: 'DM Mono', monospace; font-weight: 500; color: var(--listed); }
+  .ph-date { color: var(--text3); font-family: 'DM Mono', monospace; font-size: 11px; margin-left: auto; }
+  .ph-note { color: var(--text2); font-size: 12px; }
+
+  /* QR Modal */
+  .qr-container { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px 20px; }
+  #qr-canvas { background: #fff; padding: 14px; border-radius: 12px; }
+  .qr-item-name { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; text-align: center; }
+  .qr-url { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text3); text-align: center; word-break: break-all; max-width: 320px; }
+  .qr-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+  /* Detail */
+  .detail-prices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .detail-price-box { background: var(--surface2); border-radius: 10px; padding: 12px; text-align: center; border: 1px solid var(--border); }
+  .detail-price-box .lbl { font-size: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 1px; color: var(--text3); margin-bottom: 6px; }
+  .detail-price-box .val { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; }
+  .profit-badge { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; }
+  .profit-pos { background: rgba(74,222,128,.1); color: var(--sold); border: 1px solid rgba(74,222,128,.2); }
+  .profit-neg { background: rgba(255,71,87,.1); color: var(--danger); border: 1px solid rgba(255,71,87,.2); }
+
+  /* List view */
+  .items-list { padding: 0 16px 16px; }
+  .list-header { display: grid; grid-template-columns: 2fr 80px 80px 80px; gap: 10px; padding: 10px 14px; font-size: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 1px; color: var(--text3); border-bottom: 1px solid var(--border); }
+  .list-header span { cursor: pointer; }
+  .list-row { display: grid; grid-template-columns: 2fr 80px 80px 80px; gap: 10px; padding: 13px 14px; border-bottom: 1px solid var(--border); font-size: 13px; align-items: center; cursor: pointer; border-radius: 6px; }
+  .list-row:active { background: var(--surface2); }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 60px 24px; color: var(--text3); }
+  .empty-state .icon { font-size: 44px; margin-bottom: 14px; }
+  .empty-state h3 { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--text2); margin-bottom: 8px; }
+  .empty-state p { font-size: 14px; }
+
+  /* View toggle */
+  .view-toggle { display: flex; background: var(--surface2); border-radius: 8px; padding: 3px; border: 1px solid var(--border); }
+  .view-btn { background: none; border: none; color: var(--text2); padding: 7px 11px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all .15s; }
+  .view-btn.active { background: var(--surface3); color: var(--text); }
+
+  /* Backup section */
+  .backup-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+
+  /* Offline toast */
+  #offline-toast {
+    position: fixed; bottom: calc(20px + var(--safe-bottom)); left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--surface3); border: 1px solid var(--border); border-radius: 24px;
+    padding: 10px 20px; font-size: 13px; color: var(--text2); z-index: 999;
+    transition: transform .3s ease; white-space: nowrap;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  }
+  #offline-toast.show { transform: translateX(-50%) translateY(0); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .item-card { animation: fadeIn .25s ease backwards; }
+
+  @media (max-width: 400px) {
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .form-grid { grid-template-columns: 1fr; }
+    .form-group.full { grid-column: 1; }
+    .detail-prices { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Offline Toast -->
+<div id="offline-toast">📶 You're offline — data is saved locally</div>
+
+<!-- Install Banner (shown on non-standalone Safari) -->
+<div id="install-banner">
+  <div>
+    <strong>Add to Home Screen</strong> — tap the Share button
+    <span style="font-size:16px">⬆</span> then "Add to Home Screen" for the full app experience
+  </div>
+  <button class="dismiss" onclick="dismissBanner()">✕</button>
+</div>
+
+<header>
+  <div class="logo">Flip<span>Track</span></div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div class="view-toggle">
+      <button class="view-btn active" id="grid-btn" onclick="setView('grid')" title="Grid">⊞</button>
+      <button class="view-btn" id="list-btn" onclick="setView('list')" title="List">☰</button>
+    </div>
+    <button class="btn" onclick="openSettings()" style="padding:9px 10px;font-size:16px">⚙</button>
+    <button class="btn btn-primary" onclick="openAddModal()">+ Add</button>
+  </div>
+</header>
+
+<!-- Stats Bar -->
+<div class="stats-bar">
+  <div class="stat-cell"><div class="stat-label">Items</div><div class="stat-value blue" id="stat-total">0</div></div>
+  <div class="stat-cell"><div class="stat-label">Bought</div><div class="stat-value orange" id="stat-bought">$0</div></div>
+  <div class="stat-cell"><div class="stat-label">Listed</div><div class="stat-value yellow" id="stat-listed">$0</div></div>
+  <div class="stat-cell"><div class="stat-label">Sold</div><div class="stat-value green" id="stat-sold">$0</div></div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <div class="search-wrap">
+    <span class="icon">🔍</span>
+    <input type="text" id="search-input" placeholder="Search items…" oninput="renderItems()">
+  </div>
+  <select id="status-filter" onchange="renderItems()">
+    <option value="">All</option>
+    <option value="listed">Listed</option>
+    <option value="sold">Sold</option>
+    <option value="unlisted">Unlisted</option>
+  </select>
+  <select id="sort-select" onchange="renderItems()">
+    <option value="date-desc">Newest</option>
+    <option value="date-asc">Oldest</option>
+    <option value="name-asc">Name A–Z</option>
+    <option value="name-desc">Name Z–A</option>
+    <option value="buy-asc">Buy ↑</option>
+    <option value="buy-desc">Buy ↓</option>
+    <option value="list-asc">List ↑</option>
+    <option value="list-desc">List ↓</option>
+    <option value="sell-asc">Sell ↑</option>
+    <option value="sell-desc">Sell ↓</option>
+    <option value="profit-desc">Profit ↓</option>
+    <option value="profit-asc">Profit ↑</option>
+  </select>
+  <div id="tag-filters" class="tag-filter-wrap"></div>
+</div>
+
+<!-- Items Grid -->
+<div id="items-grid" class="items-container"></div>
+<div id="items-list-wrap" class="items-list" style="display:none">
+  <div class="list-header">
+    <span onclick="setSortList('name')">Name</span>
+    <span onclick="setSortList('buy')">Buy</span>
+    <span onclick="setSortList('list')">List</span>
+    <span onclick="setSortList('sell')">Sell</span>
+  </div>
+  <div id="items-list"></div>
+</div>
+
+<!-- ── ADD/EDIT MODAL ── -->
+<div class="modal-overlay" id="item-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Add New Item</div>
+      <button class="close-btn" onclick="closeModal('item-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section-title">Item Info</div>
+      <div class="form-grid">
+        <div class="form-group full"><label>Item Name *</label><input type="text" id="f-name" placeholder="e.g. Vintage Sony Walkman"></div>
+        <div class="form-group full"><label>Description</label><textarea id="f-desc" placeholder="Condition, details, notes…"></textarea></div>
+        <div class="form-group full">
+          <label>Tags (press Enter or comma to add)</label>
+          <div class="tags-input-wrap" id="tags-input-wrap" onclick="document.getElementById('tag-input-field').focus()">
+            <input class="tag-pill-input" id="tag-input-field" placeholder="electronics, vintage…" onkeydown="handleTagKey(event)" onblur="addTagFromInput()">
+          </div>
+        </div>
+        <div class="form-group full">
+          <label>Status</label>
+          <select id="f-status" class="form-select">
+            <option value="unlisted">Unlisted</option>
+            <option value="listed">Listed</option>
+            <option value="sold">Sold</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-section-title">Pricing</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Buy Price ($)</label><input type="number" id="f-buy" step="0.01" min="0" placeholder="0.00" inputmode="decimal"></div>
+        <div class="form-group"><label>Listing Price ($)</label><input type="number" id="f-listing" step="0.01" min="0" placeholder="0.00" inputmode="decimal"></div>
+        <div class="form-group"><label>Sell Price ($)</label><input type="number" id="f-sell" step="0.01" min="0" placeholder="0.00" inputmode="decimal"></div>
+      </div>
+
+      <div class="form-section-title">Dates</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Buy Date</label><input type="date" id="f-buydate"></div>
+        <div class="form-group"><label>Sell Date</label><input type="date" id="f-selldate"></div>
+      </div>
+
+      <div id="price-history-section" style="display:none">
+        <div class="form-section-title">Listing Price History</div>
+        <div class="price-history" id="price-history-list"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="delete-btn" onclick="deleteCurrentItem()" style="display:none">Delete</button>
+      <button class="btn" onclick="closeModal('item-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveItem()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── QR MODAL ── -->
+<div class="modal-overlay" id="qr-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">QR Code</div>
+      <button class="close-btn" onclick="closeModal('qr-modal')">✕</button>
+    </div>
+    <div class="qr-container">
+      <div class="qr-item-name" id="qr-item-name"></div>
+      <div id="qr-canvas"></div>
+      <div class="qr-url" id="qr-url-display"></div>
+      <div class="qr-actions">
+        <button class="btn btn-primary" onclick="downloadQR()">⬇ Download PNG</button>
+        <button class="btn" onclick="printQR()">🖨 Print</button>
+      </div>
+      <div style="font-size:12px;color:var(--text3);text-align:center;max-width:300px;line-height:1.6">
+        Print this as a sticker and place it on your item. Scanning it opens FlipTrack directly to this item.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ITEM DETAIL MODAL ── -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="detail-name" style="font-size:16px;flex:1;padding-right:8px"></div>
+      <button class="close-btn" onclick="closeModal('detail-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="openQRFromDetail()" style="padding:9px 10px">⊡ QR</button>
+      <button class="btn" onclick="closeModal('detail-modal')">Close</button>
+      <button class="btn btn-primary" id="detail-edit-btn">Edit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SETTINGS MODAL ── -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">Settings & Backup</div>
+      <button class="close-btn" onclick="closeModal('settings-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section-title">Data Backup</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6">Export your inventory as a JSON file to back it up or transfer it to another device. Import to restore from a backup.</p>
+      <div class="backup-row">
+        <button class="btn btn-primary" onclick="exportData()">⬇ Export Backup</button>
+        <button class="btn" onclick="document.getElementById('import-file').click()">⬆ Import Backup</button>
+        <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+      </div>
+
+      <div class="form-section-title" style="margin-top:28px">Danger Zone</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6">Permanently delete all items. Export a backup first!</p>
+      <button class="btn btn-danger" onclick="clearAllData()">🗑 Clear All Data</button>
+
+      <div class="form-section-title" style="margin-top:28px">About</div>
+      <p style="font-size:13px;color:var(--text2);line-height:1.7">
+        <strong style="color:var(--text)">FlipTrack</strong> v1.0<br>
+        Your data is stored locally on this device.<br>
+        URL: <span style="font-family:'DM Mono',monospace;color:var(--accent);font-size:11px">robsanchez422.github.io/FlipTrak</span>
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('settings-modal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──
+const BASE_URL = 'https://robsanchez422.github.io/FlipTrak/';
+
+// ── STATE ──
+let items = JSON.parse(localStorage.getItem('fliptrack_items') || '[]');
+let currentEditId = null;
+let currentTags = [];
+let activeTagFilters = [];
+let currentView = 'grid';
+let currentDetailId = null;
+
+// ── UTILS ──
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function fmt(n) { return (n != null && n !== '') ? '$' + parseFloat(n).toFixed(2) : '—'; }
+function fmtDate(d) { return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : '—'; }
+function save() { localStorage.setItem('fliptrack_items', JSON.stringify(items)); }
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  if (id === 'detail-modal' && location.hash) history.replaceState(null,'',location.pathname+location.search);
+}
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function profit(item) { return (parseFloat(item.sellPrice)||0) - (parseFloat(item.buyPrice)||0); }
+
+// ── PWA / INSTALL BANNER ──
+const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+if (!isStandalone && !localStorage.getItem('banner_dismissed')) {
+  document.getElementById('install-banner').classList.add('show');
+}
+function dismissBanner() {
+  document.getElementById('install-banner').classList.remove('show');
+  localStorage.setItem('banner_dismissed', '1');
+}
+
+// ── OFFLINE DETECTION ──
+function showOfflineToast() {
+  const t = document.getElementById('offline-toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+window.addEventListener('offline', showOfflineToast);
+
+// ── SERVICE WORKER (inline) ──
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = 'fliptrack-v1';
+    const ASSETS = [self.location.origin + self.location.pathname.replace('sw.js','') + ''];
+    self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/']))); self.skipWaiting(); });
+    self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))); self.clients.claim(); });
+    self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => { const clone = res.clone(); caches.open(CACHE).then(c => c.put(e.request, clone)); return res; }).catch(() => caches.match('/')))); });
+  `;
+  const swBlob = new Blob([swCode], {type: 'application/javascript'});
+  const swUrl = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swUrl).catch(() => {});
+}
+
+// ── DEEP LINK on load ──
+window.addEventListener('load', () => {
+  const hash = location.hash.slice(1);
+  if (hash) { const item = items.find(i => i.id === hash); if (item) setTimeout(() => openDetail(item.id), 400); }
+});
+
+// ── STATS ──
+function updateStats() {
+  const bought = items.reduce((s,i) => s+(parseFloat(i.buyPrice)||0), 0);
+  const listed = items.filter(i=>i.status==='listed').reduce((s,i) => s+(parseFloat(i.listingPrice)||0), 0);
+  const sold = items.filter(i=>i.status==='sold').reduce((s,i) => s+(parseFloat(i.sellPrice)||0), 0);
+  document.getElementById('stat-total').textContent = items.length;
+  document.getElementById('stat-bought').textContent = '$'+bought.toFixed(2);
+  document.getElementById('stat-listed').textContent = '$'+listed.toFixed(2);
+  document.getElementById('stat-sold').textContent = '$'+sold.toFixed(2);
+}
+
+// ── TAGS ──
+function getAllTags() { const s=new Set(); items.forEach(i=>(i.tags||[]).forEach(t=>s.add(t))); return [...s].sort(); }
+function renderTagFilters() {
+  const wrap = document.getElementById('tag-filters');
+  const tags = getAllTags();
+  if (!tags.length) { wrap.innerHTML=''; return; }
+  wrap.innerHTML = '<span style="font-size:11px;color:var(--text3);font-family:\'DM Mono\',monospace">Tags:</span>' +
+    tags.map(t=>`<span class="tag-chip ${activeTagFilters.includes(t)?'active':''}" onclick="toggleTagFilter('${escHtml(t)}')">${escHtml(t)}</span>`).join('');
+}
+function toggleTagFilter(tag) {
+  const idx = activeTagFilters.indexOf(tag);
+  if (idx>-1) activeTagFilters.splice(idx,1); else activeTagFilters.push(tag);
+  renderItems();
+}
+
+// ── RENDER ──
+function getFilteredSorted() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const status = document.getElementById('status-filter').value;
+  const sort = document.getElementById('sort-select').value;
+  let f = items.filter(i => {
+    if (search && !i.name.toLowerCase().includes(search)) return false;
+    if (status && i.status!==status) return false;
+    if (activeTagFilters.length && !activeTagFilters.every(t=>(i.tags||[]).includes(t))) return false;
+    return true;
+  });
+  f.sort((a,b) => {
+    switch(sort) {
+      case 'name-asc': return a.name.localeCompare(b.name);
+      case 'name-desc': return b.name.localeCompare(a.name);
+      case 'buy-asc': return (parseFloat(a.buyPrice)||0)-(parseFloat(b.buyPrice)||0);
+      case 'buy-desc': return (parseFloat(b.buyPrice)||0)-(parseFloat(a.buyPrice)||0);
+      case 'list-asc': return (parseFloat(a.listingPrice)||0)-(parseFloat(b.listingPrice)||0);
+      case 'list-desc': return (parseFloat(b.listingPrice)||0)-(parseFloat(a.listingPrice)||0);
+      case 'sell-asc': return (parseFloat(a.sellPrice)||0)-(parseFloat(b.sellPrice)||0);
+      case 'sell-desc': return (parseFloat(b.sellPrice)||0)-(parseFloat(a.sellPrice)||0);
+      case 'profit-desc': return profit(b)-profit(a);
+      case 'profit-asc': return profit(a)-profit(b);
+      case 'date-asc': return (a.createdAt||0)-(b.createdAt||0);
+      default: return (b.createdAt||0)-(a.createdAt||0);
+    }
+  });
+  return f;
+}
+
+function renderItems() {
+  updateStats(); renderTagFilters();
+  const f = getFilteredSorted();
+  if (currentView==='grid') renderGrid(f); else renderList(f);
+}
+
+function renderGrid(f) {
+  const grid = document.getElementById('items-grid');
+  if (!f.length) { grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><div class="icon">📦</div><h3>No items found</h3><p>Add your first item or adjust filters</p></div>`; return; }
+  grid.innerHTML = f.map((item,i) => `
+    <div class="item-card" style="animation-delay:${i*0.03}s" onclick="openDetail('${item.id}')">
+      <div class="item-card-header">
+        <div class="item-name">${escHtml(item.name)}</div>
+        <div class="status-badge status-${item.status}">${item.status}</div>
+      </div>
+      <div class="item-card-body">
+        <div class="price-row">
+          <div class="price-item"><div class="price-label">Buy</div><div class="price-val buy">${fmt(item.buyPrice)}</div></div>
+          <div class="price-item"><div class="price-label">Listed</div><div class="price-val list">${fmt(item.listingPrice)}</div></div>
+          <div class="price-item"><div class="price-label">Sold</div><div class="price-val sell">${fmt(item.sellPrice)}</div></div>
+        </div>
+        ${item.description?`<div class="desc-text">${escHtml(item.description)}</div>`:''}
+        ${item.tags&&item.tags.length?`<div class="tags-row">${item.tags.map(t=>`<span class="item-tag">${escHtml(t)}</span>`).join('')}</div>`:''}
+      </div>
+      <div class="item-card-footer">
+        <div class="date-text">${item.buyDate?'Bought '+fmtDate(item.buyDate):''}</div>
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="icon-btn" onclick="openQR('${item.id}')" title="QR Code">⊡</button>
+          <button class="icon-btn" onclick="openEditModal('${item.id}')" title="Edit">✎</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderList(f) {
+  const list = document.getElementById('items-list');
+  if (!f.length) { list.innerHTML=`<div class="empty-state"><div class="icon">📦</div><h3>No items found</h3></div>`; return; }
+  list.innerHTML = f.map(item => `
+    <div class="list-row" onclick="openDetail('${item.id}')">
+      <div><strong>${escHtml(item.name)}</strong><br><span class="status-badge status-${item.status}" style="margin-top:4px;display:inline-block">${item.status}</span></div>
+      <div style="font-family:'DM Mono',monospace;color:var(--bought);font-size:12px">${fmt(item.buyPrice)}</div>
+      <div style="font-family:'DM Mono',monospace;color:var(--listed);font-size:12px">${fmt(item.listingPrice)}</div>
+      <div style="font-family:'DM Mono',monospace;color:var(--sold);font-size:12px">${fmt(item.sellPrice)}</div>
+    </div>`).join('');
+}
+
+function setView(v) {
+  currentView=v;
+  document.getElementById('items-grid').style.display = v==='grid'?'grid':'none';
+  document.getElementById('items-list-wrap').style.display = v==='list'?'block':'none';
+  document.getElementById('grid-btn').classList.toggle('active', v==='grid');
+  document.getElementById('list-btn').classList.toggle('active', v==='list');
+  renderItems();
+}
+
+function setSortList(field) {
+  const sel=document.getElementById('sort-select');
+  sel.value = sel.value===field+'-asc' ? field+'-desc' : field+'-asc';
+  renderItems();
+}
+
+// ── TAGS INPUT ──
+function handleTagKey(e) {
+  if (e.key==='Enter'||e.key===',') { e.preventDefault(); addTagFromInput(); }
+  if (e.key==='Backspace'&&e.target.value===''&&currentTags.length) { currentTags.pop(); renderTagPills(); }
+}
+function addTagFromInput() {
+  const input=document.getElementById('tag-input-field');
+  if (!input) return;
+  const val=input.value.trim().replace(/,/g,'').toLowerCase();
+  if (val&&!currentTags.includes(val)) { currentTags.push(val); renderTagPills(); }
+  input.value='';
+}
+function removeTag(t) { currentTags=currentTags.filter(x=>x!==t); renderTagPills(); }
+function renderTagPills() {
+  const wrap=document.getElementById('tags-input-wrap');
+  wrap.innerHTML=currentTags.map(t=>`<span class="tag-pill">${escHtml(t)}<button onclick="removeTag('${escHtml(t)}')" type="button">×</button></span>`).join('')+
+    `<input class="tag-pill-input" id="tag-input-field" placeholder="${currentTags.length?'':'add tag…'}" onkeydown="handleTagKey(event)" onblur="addTagFromInput()">`;
+}
+
+// ── MODALS ──
+function openAddModal() {
+  currentEditId=null; currentTags=[];
+  document.getElementById('modal-title').textContent='Add New Item';
+  document.getElementById('delete-btn').style.display='none';
+  document.getElementById('price-history-section').style.display='none';
+  ['f-name','f-desc','f-buy','f-listing','f-sell','f-buydate','f-selldate'].forEach(id=>{ document.getElementById(id).value=''; });
+  document.getElementById('f-status').value='unlisted';
+  renderTagPills();
+  document.getElementById('item-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('f-name').focus(),300);
+}
+
+function openEditModal(id) {
+  const item=items.find(i=>i.id===id); if(!item) return;
+  currentEditId=id; currentTags=[...(item.tags||[])];
+  document.getElementById('modal-title').textContent='Edit Item';
+  document.getElementById('delete-btn').style.display='block';
+  document.getElementById('f-name').value=item.name||'';
+  document.getElementById('f-desc').value=item.description||'';
+  document.getElementById('f-buy').value=item.buyPrice||'';
+  document.getElementById('f-listing').value=item.listingPrice||'';
+  document.getElementById('f-sell').value=item.sellPrice||'';
+  document.getElementById('f-buydate').value=item.buyDate||'';
+  document.getElementById('f-selldate').value=item.sellDate||'';
+  document.getElementById('f-status').value=item.status||'unlisted';
+  renderTagPills();
+  const ph=item.priceHistory||[];
+  if (ph.length) {
+    document.getElementById('price-history-section').style.display='block';
+    document.getElementById('price-history-list').innerHTML=ph.map(p=>
+      `<div class="ph-row"><span class="ph-price">${fmt(p.price)}</span><span class="ph-note">${escHtml(p.note||'')}</span><span class="ph-date">${new Date(p.date).toLocaleString()}</span></div>`
+    ).join('');
+  } else { document.getElementById('price-history-section').style.display='none'; }
+  closeModal('detail-modal');
+  document.getElementById('item-modal').classList.add('open');
+}
+
+function openSettings() { document.getElementById('settings-modal').classList.add('open'); }
+
+function saveItem() {
+  const name=document.getElementById('f-name').value.trim();
+  if (!name) { alert('Item name is required'); return; }
+  addTagFromInput();
+  const newListing=document.getElementById('f-listing').value;
+  if (currentEditId) {
+    const item=items.find(i=>i.id===currentEditId);
+    const oldListing=item.listingPrice;
+    if (newListing&&newListing!==oldListing) {
+      if (!item.priceHistory) item.priceHistory=[];
+      item.priceHistory.push({price:oldListing||0, date:new Date().toISOString(), note:'Updated from '+fmt(oldListing)});
+    }
+    Object.assign(item, {
+      name, description:document.getElementById('f-desc').value.trim(),
+      buyPrice:document.getElementById('f-buy').value,
+      listingPrice:newListing,
+      sellPrice:document.getElementById('f-sell').value,
+      buyDate:document.getElementById('f-buydate').value,
+      sellDate:document.getElementById('f-selldate').value,
+      status:document.getElementById('f-status').value,
+      tags:[...currentTags], updatedAt:Date.now()
+    });
+  } else {
+    items.unshift({ id:genId(), name, description:document.getElementById('f-desc').value.trim(),
+      buyPrice:document.getElementById('f-buy').value, listingPrice:newListing,
+      sellPrice:document.getElementById('f-sell').value,
+      buyDate:document.getElementById('f-buydate').value,
+      sellDate:document.getElementById('f-selldate').value,
+      status:document.getElementById('f-status').value,
+      tags:[...currentTags], priceHistory:[], createdAt:Date.now(), updatedAt:Date.now()
+    });
+  }
+  save(); closeModal('item-modal'); renderItems();
+}
+
+function deleteCurrentItem() {
+  if (!currentEditId) return;
+  if (!confirm('Delete this item? This cannot be undone.')) return;
+  items=items.filter(i=>i.id!==currentEditId);
+  save(); closeModal('item-modal'); renderItems();
+}
+
+// ── DETAIL ──
+function openDetail(id) {
+  const item=items.find(i=>i.id===id); if(!item) return;
+  currentDetailId=id;
+  history.replaceState(null,'',location.pathname+location.search+'#'+id);
+  const p=profit(item), hasSell=item.sellPrice&&parseFloat(item.sellPrice)>0;
+  document.getElementById('detail-name').textContent=item.name;
+  document.getElementById('detail-edit-btn').onclick=()=>openEditModal(id);
+  let html=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <span class="status-badge status-${item.status}">${item.status}</span>
+      ${hasSell?`<span class="profit-badge ${p>=0?'profit-pos':'profit-neg'}">${p>=0?'▲':'▼'} ${fmt(Math.abs(p))} ${p>=0?'profit':'loss'}</span>`:''}
+    </div>
+    <div class="detail-prices">
+      <div class="detail-price-box"><div class="lbl">Buy</div><div class="val" style="color:var(--bought)">${fmt(item.buyPrice)}</div></div>
+      <div class="detail-price-box"><div class="lbl">Listed</div><div class="val" style="color:var(--listed)">${fmt(item.listingPrice)}</div></div>
+      <div class="detail-price-box"><div class="lbl">Sold</div><div class="val" style="color:var(--sold)">${fmt(item.sellPrice)}</div></div>
+    </div>`;
+  if (item.description) html+=`<div style="margin-bottom:16px"><div class="form-section-title">Description</div><p style="font-size:14px;color:var(--text2);line-height:1.7">${escHtml(item.description)}</p></div>`;
+  if (item.tags&&item.tags.length) html+=`<div style="margin-bottom:16px"><div class="form-section-title">Tags</div><div class="tags-row">${item.tags.map(t=>`<span class="item-tag">${escHtml(t)}</span>`).join('')}</div></div>`;
+  const dates=[item.buyDate?`<div style="margin-bottom:8px"><span style="color:var(--text3);font-size:11px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Bought</span><br><span style="font-size:14px">${fmtDate(item.buyDate)}</span></div>`:'', item.sellDate?`<div><span style="color:var(--text3);font-size:11px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Sold</span><br><span style="font-size:14px">${fmtDate(item.sellDate)}</span></div>`:''  ].filter(Boolean).join('');
+  if (dates) html+=`<div style="margin-bottom:16px"><div class="form-section-title">Dates</div>${dates}</div>`;
+  const ph=item.priceHistory||[];
+  if (ph.length) html+=`<div><div class="form-section-title">Price History</div><div class="price-history">${ph.map(p=>`<div class="ph-row"><span class="ph-price">${fmt(p.price)}</span><span class="ph-note">${escHtml(p.note||'')}</span><span class="ph-date">${new Date(p.date).toLocaleString()}</span></div>`).join('')}</div></div>`;
+  document.getElementById('detail-body').innerHTML=html;
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+function openQRFromDetail() {
+  if (currentDetailId) { closeModal('detail-modal'); setTimeout(()=>openQR(currentDetailId),200); }
+}
+
+// ── QR ──
+function openQR(id) {
+  const item=items.find(i=>i.id===id); if(!item) return;
+  const url=BASE_URL+'#'+id;
+  document.getElementById('qr-item-name').textContent=item.name;
+  document.getElementById('qr-url-display').textContent=url;
+  document.getElementById('qr-canvas').innerHTML='';
+  new QRCode(document.getElementById('qr-canvas'),{text:url,width:220,height:220,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
+  document.getElementById('qr-modal').classList.add('open');
+}
+
+function downloadQR() {
+  setTimeout(()=>{
+    const canvas=document.querySelector('#qr-canvas canvas');
+    if(!canvas){alert('QR not ready');return;}
+    const name=document.getElementById('qr-item-name').textContent.replace(/\s+/g,'_');
+    const a=document.createElement('a'); a.download=`QR_${name}.png`; a.href=canvas.toDataURL('image/png'); a.click();
+  },200);
+}
+
+function printQR() {
+  const canvas=document.querySelector('#qr-canvas canvas');
+  const name=document.getElementById('qr-item-name').textContent;
+  const url=document.getElementById('qr-url-display').textContent;
+  if(!canvas) return;
+  const win=window.open('','_blank');
+  win.document.write(`<html><head><title>QR — ${name}</title><style>body{font-family:sans-serif;text-align:center;padding:40px}h2{margin-bottom:12px}p{font-size:11px;color:#666;margin-top:8px;word-break:break-all;max-width:280px;margin:8px auto 0}</style></head><body><h2>${name}</h2><img src="${canvas.toDataURL()}" style="width:220px;height:220px"><p>${url}</p></body></html>`);
+  win.document.close(); win.focus(); setTimeout(()=>win.print(),300);
+}
+
+// ── BACKUP / RESTORE ──
+function exportData() {
+  const data={version:1,exportedAt:new Date().toISOString(),items};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`FlipTrack_backup_${new Date().toISOString().slice(0,10)}.json`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(e) {
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try {
+      const data=JSON.parse(ev.target.result);
+      const imported=data.items||data;
+      if (!Array.isArray(imported)) throw new Error('Invalid format');
+      if (!confirm(`Import ${imported.length} items? This will REPLACE your current data.`)) return;
+      items=imported; save(); renderItems();
+      alert(`✅ Imported ${imported.length} items successfully!`);
+      closeModal('settings-modal');
+    } catch(err) { alert('❌ Invalid backup file. Please use a FlipTrack backup JSON.'); }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+}
+
+function clearAllData() {
+  if (!confirm('⚠️ Delete ALL items permanently? Export a backup first!')) return;
+  if (!confirm('Are you absolutely sure? This cannot be undone.')) return;
+  items=[]; save(); renderItems(); closeModal('settings-modal');
+}
+
+// ── CLOSE on overlay click ──
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  o.addEventListener('click',e=>{ if(e.target===o){ if(o.id==='detail-modal') closeModal('detail-modal'); else o.classList.remove('open'); }});
+});
+
+// ── INIT ──
+renderItems();
+</script>
+</body>
+</html>
